@@ -30,26 +30,43 @@
 const char *last_run_err;
 #define RAISE_RUN(err) {last_run_err = err;return -1;}
 
+long long read_vsize(char const *stat_file) {
+    FILE *fr = fopen(stat_file, "r");
+    int blank = 22;
+    int ch;
+    while (0 < blank && (EOF != (ch = fgetc(fr)))) {
+        if (' ' == ch)
+            blank--;
+    }
+    long long int vsize = 0;
+    if (1 != fscanf(fr, "%lld", &vsize))
+        RAISE_RUN("read proc stat failed");
+    fclose(fr);
+    return vsize;
+}
+
 int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
     int status, incall = 0;
     struct rusage ru;
     struct user_regs_struct regs;
+    char stat_file[32];
+    sprintf(stat_file, "/proc/%d/stat", (int)pid);
 
+    rst->memory_used = 0;
     while (1) {
         if (wait4(pid, &status, WSTOPPED, &ru) == -1)
             RAISE_RUN("wait4 [WSTOPPED] failure");
-
-        if (WIFEXITED(status))
+        if (WIFEXITED(status)) {
+            rst->re_signum = WEXITSTATUS(status);
             break;
-        else if (WSTOPSIG(status) != SIGTRAP) {
+        } else if (WSTOPSIG(status) != SIGTRAP) {
             ptrace(PTRACE_KILL, pid, NULL, NULL);
             waitpid(pid, NULL, 0);
 
-            rst->time_used = ru.ru_utime.tv_sec * 1000
-                    + ru.ru_utime.tv_usec / 1000
-                    + ru.ru_stime.tv_sec * 1000
-                    + ru.ru_stime.tv_usec / 1000;
-            rst->memory_used = ru.ru_maxrss;
+            rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
+                    + ru.ru_utime.tv_usec
+                    + ru.ru_stime.tv_sec * 1000 * 1000
+                    + ru.ru_stime.tv_usec;
 
             switch (WSTOPSIG(status)) {
                 case SIGSEGV:
@@ -68,11 +85,10 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
             }
 
             rst->re_signum = WSTOPSIG(status);
-            rst->time_used = ru.ru_utime.tv_sec * 1000
-                    + ru.ru_utime.tv_usec / 1000
-                    + ru.ru_stime.tv_sec * 1000
-                    + ru.ru_stime.tv_usec / 1000;
-            rst->memory_used = ru.ru_maxrss;
+            rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
+                    + ru.ru_utime.tv_usec
+                    + ru.ru_stime.tv_sec * 1000 * 1000
+                    + ru.ru_stime.tv_usec;
             return 0;
         }
 
@@ -85,12 +101,10 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
                 ptrace(PTRACE_KILL, pid, NULL, NULL);
                 waitpid(pid, NULL, 0);
 
-                rst->time_used = ru.ru_utime.tv_sec * 1000
-                        + ru.ru_utime.tv_usec / 1000
-                        + ru.ru_stime.tv_sec * 1000
-                        + ru.ru_stime.tv_usec / 1000;
-                rst->memory_used = ru.ru_maxrss
-                        * (sysconf(_SC_PAGESIZE) / 1024);
+                rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
+                        + ru.ru_utime.tv_usec
+                        + ru.ru_stime.tv_sec * 1000 * 1000
+                        + ru.ru_stime.tv_usec;
 
                 rst->judge_result = RE;
                 if (ret == ACCESS_CALL_ERR) {
@@ -101,6 +115,9 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
                 }
                 return 0;
             }
+            int vsize = (int)(read_vsize(stat_file) / 1024);
+            if (vsize > rst->memory_used)
+                rst->memory_used = vsize;
             incall = 0;
         } else
             incall = 1;
@@ -109,15 +126,13 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
     }
     
     
-    rst->time_used = ru.ru_utime.tv_sec * 1000
-            + ru.ru_utime.tv_usec / 1000
-            + ru.ru_stime.tv_sec * 1000
-            + ru.ru_stime.tv_usec / 1000;
-    rst->memory_used = ru.ru_maxrss;
+    rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
+            + ru.ru_utime.tv_usec
+            + ru.ru_stime.tv_sec * 1000 * 1000
+            + ru.ru_stime.tv_usec;
 
-
-    if (rst->time_used > runobj->time_limit)
-        rst->judge_result = TLE;
+    if (rst->time_used > runobj->time_limit * 1000)
+        rst->judge_result = TLEKN;
     else if (rst->memory_used > runobj->memory_limit)
         rst->judge_result = MLE;
     else
@@ -127,6 +142,7 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
 }
 
 int waitExit(struct Runobj *runobj, struct Result *rst, pid_t pid) {
+    RAISE_RUN("not implemented waitExit");
     int status;
     struct rusage ru;
 

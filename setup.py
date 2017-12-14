@@ -10,7 +10,7 @@ sources = [
 ]
 
 setup(name='lorun',
-    version='1.0.1',
+    version='2.0.0',
     description='loco program runner core',
     ext_modules=[Extension('lorun/_lorun_ext', sources=sources)],
     packages=['lorun']
