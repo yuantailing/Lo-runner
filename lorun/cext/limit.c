@@ -35,20 +35,15 @@ int setResLimit(struct Runobj *runobj) {
     if (setrlimit(RLIMIT_CPU, &rl))
         RAISE_EXIT("set RLIMIT_CPU failure");
 
-    rl.rlim_cur = runobj->memory_limit * 1024;
-    rl.rlim_max = rl.rlim_cur + 1024;
+    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024;
+    rl.rlim_max = rl.rlim_cur + 256 * 1024 * 1024;
     if (setrlimit(RLIMIT_DATA, &rl))
         RAISE_EXIT("set RLIMIT_DATA failure");
 
-    rl.rlim_cur = runobj->memory_limit * 1024 * 2;
-    rl.rlim_max = rl.rlim_cur + 1024;
+    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024 * 2;
+    rl.rlim_max = rl.rlim_cur + 256 * 1024 * 1024;
     if (setrlimit(RLIMIT_AS, &rl))
         RAISE_EXIT("set RLIMIT_AS failure");
-
-    rl.rlim_cur = 256 * 1024 * 1024;
-    rl.rlim_max = rl.rlim_cur + 1024;
-    if (setrlimit(RLIMIT_STACK, &rl))
-        RAISE_EXIT("set RLIMIT_STACK failure");
 
     /*
     p_realt.it_interval.tv_sec = runobj->time_limit / 1000 + 3;
