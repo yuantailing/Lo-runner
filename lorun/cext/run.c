@@ -45,6 +45,13 @@ long long read_vsize(char const *stat_file) {
     return vsize;
 }
 
+int time_used(struct rusage *ru_ptr) {
+    return ru_ptr->ru_utime.tv_sec * 1000 * 1000
+        + ru_ptr->ru_utime.tv_usec
+        + ru_ptr->ru_stime.tv_sec * 1000 * 1000
+        + ru_ptr->ru_stime.tv_usec;
+}
+
 int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
     int status, incall = 0;
     struct rusage ru;
@@ -63,17 +70,11 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
             ptrace(PTRACE_KILL, pid, NULL, NULL);
             waitpid(pid, NULL, 0);
 
-            rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
-                    + ru.ru_utime.tv_usec
-                    + ru.ru_stime.tv_sec * 1000 * 1000
-                    + ru.ru_stime.tv_usec;
+            rst->time_used = time_used(&ru);
 
             switch (WSTOPSIG(status)) {
                 case SIGSEGV:
-                    if (rst->memory_used > runobj->memory_limit)
-                        rst->judge_result = MLE;
-                    else
-                        rst->judge_result = RE;
+                    rst->judge_result = RE;
                     break;
                 case SIGALRM:
                 case SIGXCPU:
@@ -85,10 +86,6 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
             }
 
             rst->re_signum = WSTOPSIG(status);
-            rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
-                    + ru.ru_utime.tv_usec
-                    + ru.ru_stime.tv_sec * 1000 * 1000
-                    + ru.ru_stime.tv_usec;
             return 0;
         }
 
@@ -97,27 +94,32 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
 
         if (incall) {
             int ret = checkAccess(runobj, pid, &regs);
-            if (ret != ACCESS_OK) {
-                ptrace(PTRACE_KILL, pid, NULL, NULL);
-                waitpid(pid, NULL, 0);
-
-                rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
-                        + ru.ru_utime.tv_usec
-                        + ru.ru_stime.tv_sec * 1000 * 1000
-                        + ru.ru_stime.tv_usec;
-
-                rst->judge_result = RE;
-                if (ret == ACCESS_CALL_ERR) {
-                    rst->re_call = REG_SYS_CALL(&regs);
-                } else {
-                    rst->re_file = lastFileAccess();
-                    rst->re_file_flag = REG_ARG_2(&regs);
-                }
-                return 0;
-            }
             int vsize = (int)(read_vsize(stat_file) / 1024);
             if (vsize > rst->memory_used)
                 rst->memory_used = vsize;
+
+            if (ret != ACCESS_OK
+                    || rst->memory_used > runobj->memory_limit
+                    || rst->time_used > runobj->time_limit + 500 * 1000) {
+                ptrace(PTRACE_KILL, pid, NULL, NULL);
+                waitpid(pid, NULL, 0);
+
+                rst->time_used = time_used(&ru);
+                if (ret != ACCESS_OK) {
+                    rst->judge_result = RE;
+                    if (ret == ACCESS_CALL_ERR) {
+                        rst->re_call = REG_SYS_CALL(&regs);
+                    } else {
+                        rst->re_file = lastFileAccess();
+                        rst->re_file_flag = REG_ARG_2(&regs);
+                    }
+                } else if (rst->memory_used > runobj->memory_limit) {
+                    rst->judge_result = MLE;
+                } else {
+                    rst->judge_result = TLE;
+                }
+                return 0;
+            }
             incall = 0;
         } else
             incall = 1;
@@ -125,16 +127,10 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
         ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
     }
     
-    
-    rst->time_used = ru.ru_utime.tv_sec * 1000 * 1000
-            + ru.ru_utime.tv_usec
-            + ru.ru_stime.tv_sec * 1000 * 1000
-            + ru.ru_stime.tv_usec;
+    rst->time_used = time_used(&ru);
 
     if (rst->time_used > runobj->time_limit * 1000)
         rst->judge_result = TLEKN;
-    else if (rst->memory_used > runobj->memory_limit)
-        rst->judge_result = MLE;
     else
         rst->judge_result = AC;
 
