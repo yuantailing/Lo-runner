@@ -32,6 +32,17 @@ def runone(p_path, in_path, out_path):
         'fd_out':ftemp.fileno(),
         'timelimit':1000, #in MS
         'memorylimit':20000, #in KB
+        'trace': True,
+        'calls': [12, 21, 9, 2, 5, 3, 0, 10, 158, 11, 1, 231, 14, 186, 234, 20, 8],
+        'files': {
+            '/etc/ld.so.cache': 524288L,
+            '/usr/lib/x86_64-linux-gnu/libstdc++.so.6': 524288L,
+            '/lib/x86_64-linux-gnu/libm.so.6': 524288L,
+            '/lib/x86_64-linux-gnu/libgcc_s.so.1': 524288L,
+            '/lib/x86_64-linux-gnu/libc.so.6': 524288L,
+            '/proc/meminfo': 524288L,
+            '/dev/tty': 2306L,
+        },
     }
     
     rst = lorun.run(runcfg)

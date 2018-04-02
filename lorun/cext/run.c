@@ -17,6 +17,7 @@
  */
 
 #include "run.h"
+#include <sys/syscall.h>
 #include <sys/ptrace.h>
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -94,9 +95,11 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
 
         if (incall) {
             int ret = checkAccess(runobj, pid, &regs);
-            int vsize = (int)(read_vsize(stat_file) / 1024);
-            if (vsize > rst->memory_used)
-                rst->memory_used = vsize;
+            if (REG_SYS_CALL(&regs) != SYS_read) {
+                int vsize = (int)(read_vsize(stat_file) / 1024);
+                if (vsize > rst->memory_used)
+                    rst->memory_used = vsize;
+            }
 
             if (ret != ACCESS_OK
                     || rst->memory_used > runobj->memory_limit
