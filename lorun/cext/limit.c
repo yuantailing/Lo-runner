@@ -35,13 +35,13 @@ int setResLimit(struct Runobj *runobj) {
     if (setrlimit(RLIMIT_CPU, &rl))
         RAISE_EXIT("set RLIMIT_CPU failure");
 
-    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024;
-    rl.rlim_max = rl.rlim_cur + 256 * 1024 * 1024;
+    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024 + (rlim_t)(512 * 1024 * 1024 - 1);
+    rl.rlim_max = rl.rlim_cur;
     if (setrlimit(RLIMIT_DATA, &rl))
         RAISE_EXIT("set RLIMIT_DATA failure");
 
-    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024 * 2;
-    rl.rlim_max = rl.rlim_cur + 256 * 1024 * 1024;
+    rl.rlim_cur = (rlim_t)runobj->memory_limit * 1024 + (rlim_t)(512 * 1024 * 1024 - 1);
+    rl.rlim_max = rl.rlim_cur;
     if (setrlimit(RLIMIT_AS, &rl))
         RAISE_EXIT("set RLIMIT_AS failure");
 

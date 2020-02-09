@@ -95,7 +95,7 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
 
         if (incall) {
             int ret = checkAccess(runobj, pid, &regs);
-            if (REG_SYS_CALL(&regs) != SYS_read) {
+            if (REG_SYS_CALL(&regs) != SYS_read && REG_SYS_CALL(&regs) != SYS_write) {
                 int vsize = (int)(read_vsize(stat_file) / 1024);
                 if (vsize > rst->memory_used)
                     rst->memory_used = vsize;
