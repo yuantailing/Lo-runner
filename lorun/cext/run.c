@@ -114,7 +114,7 @@ int traceLoop(struct Runobj *runobj, struct Result *rst, pid_t pid) {
                         rst->re_call = REG_SYS_CALL(&regs);
                     } else {
                         rst->re_file = lastFileAccess();
-                        rst->re_file_flag = REG_ARG_2(&regs);
+                        rst->re_file_flag = REG_SYS_CALL(&regs) == SYS_open ? REG_ARG_2(&regs) : REG_ARG_3(&regs);
                     }
                 } else if (rst->memory_used > runobj->memory_limit) {
                     rst->judge_result = MLE;

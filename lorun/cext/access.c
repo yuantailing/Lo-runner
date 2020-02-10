@@ -47,13 +47,16 @@ int checkAccess(struct Runobj *runobj, int pid, struct user_regs_struct *regs) {
         return ACCESS_CALL_ERR;
 
     switch (REG_SYS_CALL(regs)) {
-        case SYS_open: {
+        case SYS_open: case SYS_openat: {
+            unsigned long long pathname = REG_SYS_CALL(regs) == SYS_open ? REG_ARG_1(regs) : REG_ARG_2(regs);
+            unsigned long long flags = REG_SYS_CALL(regs) == SYS_open ? REG_ARG_2(regs) : REG_ARG_3(regs);
+
             int i, j;
 
             for (i = 0; i < 100; i++) {
                 const char* test;
                 long t = ptrace(PTRACE_PEEKDATA, pid,
-                    REG_ARG_1(regs) + i * sizeof(long), NULL);
+                    pathname + i * sizeof(long), NULL);
                 file_temp[i] = t;
                 test = (const char*) &file_temp[i];
                 for (j = 0; j < sizeof(long); j++) {
@@ -64,12 +67,15 @@ int checkAccess(struct Runobj *runobj, int pid, struct user_regs_struct *regs) {
             }
             l_cont: file_temp[99] = 0;
 
-            if (fileAccess(runobj->files, (const char*)file_temp,
-                    REG_ARG_2(regs))) {
-                return ACCESS_OK;
+            if (REG_SYS_CALL(regs) == SYS_openat && (int)REG_ARG_1(regs) != AT_FDCWD) {
+                return ACCESS_FILE_ERR;
             }
 
-            return ACCESS_FILE_ERR;
+            if (!fileAccess(runobj->files, (const char*)file_temp, flags)) {
+                return ACCESS_FILE_ERR;
+            }
+
+            return ACCESS_OK;
         }
     }
 
